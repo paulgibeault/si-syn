@@ -152,13 +152,7 @@ function setupCircuitBoard() {
     );
   }
 
-  // Pre-wire
-  if (boardConfig.wires) {
-    for (const w of boardConfig.wires) {
-      const wire = board.addWire(w.from, w.fromPin, w.to, w.toPin);
-      if (wire && w.locked) wire.locked = true;
-    }
-  }
+  // Wires are player-drawn — no pre-wiring
 
   // Setup component tray for player-placeable components
   renderComponentTray(boardConfig);

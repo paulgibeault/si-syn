@@ -75,8 +75,8 @@ export function createCircuitBoard({
   let wiringFrom = null;   // { comp, pin, el } when in wiring mode
   let cellSize = 48;
   let wireIdCounter = 0;
-  let lastTapWire = null;
-  let lastTapTime = 0;
+  let selectedWire = null;
+  let deleteBtn = null;
 
   // DOM elements
   let gridEl = null;
@@ -455,6 +455,7 @@ export function createCircuitBoard({
 
   function onGridTap(e) {
     if (e.target.closest('.cb-comp') || e.target.closest('.cb-pin')) return;
+    if (selectedWire) { deselectWire(); return; }
 
     const rect = gridEl.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -553,22 +554,63 @@ export function createCircuitBoard({
   }
 
   function onWireTap(wireId) {
-    const now = Date.now();
-    if (lastTapWire === wireId && now - lastTapTime < 500) {
-      // Double tap — delete
-      const wire = wires.find(w => w.id === wireId);
-      if (wire && !wire.locked) {
+    const wire = wires.find(w => w.id === wireId);
+    if (!wire) return;
+
+    if (selectedWire === wireId) {
+      // Already selected — deselect
+      deselectWire();
+      return;
+    }
+
+    selectWire(wireId);
+  }
+
+  function selectWire(wireId) {
+    deselectWire();
+    const wire = wires.find(w => w.id === wireId);
+    if (!wire || !wire.pathEl) return;
+
+    selectedWire = wireId;
+    wire.pathEl.classList.add('selected');
+
+    // Show delete button at the midpoint of the wire
+    const bbox = wire.pathEl.getBBox();
+    const midX = bbox.x + bbox.width / 2;
+    const midY = bbox.y + bbox.height / 2;
+
+    deleteBtn = document.createElement('button');
+    deleteBtn.className = 'cb-wire-delete';
+    deleteBtn.textContent = '\u00D7';
+    deleteBtn.style.left = midX + 'px';
+    deleteBtn.style.top = midY + 'px';
+    deleteBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!wire.locked) {
         removeWire(wireId);
         setStatus('Wire removed');
         setTimeout(() => { if (mode === 'idle') setStatus(''); }, 1500);
+      } else {
+        setStatus('This wire is locked');
+        setTimeout(() => setStatus(''), 1500);
       }
-      lastTapWire = null;
-    } else {
-      lastTapWire = wireId;
-      lastTapTime = now;
-      setStatus('Double-tap to remove wire');
-      setTimeout(() => { if (lastTapWire === wireId) { lastTapWire = null; setStatus(''); } }, 2000);
+      deselectWire();
+    });
+    gridEl.appendChild(deleteBtn);
+    setStatus('Tap \u00D7 to remove wire');
+  }
+
+  function deselectWire() {
+    if (selectedWire) {
+      const wire = wires.find(w => w.id === selectedWire);
+      if (wire?.pathEl) wire.pathEl.classList.remove('selected');
+      selectedWire = null;
     }
+    if (deleteBtn) {
+      deleteBtn.remove();
+      deleteBtn = null;
+    }
+    if (mode === 'idle') setStatus('');
   }
 
   function setStatus(text) {
@@ -691,6 +733,26 @@ export function createCircuitBoard({
   function getPlacedByType(type) {
     return placed.filter(c => c.type === type);
   }
+
+  // -----------------------------------------------------------------------
+  // Keyboard shortcuts for wire management
+  // -----------------------------------------------------------------------
+
+  document.addEventListener('keydown', (e) => {
+    if (!selectedWire) return;
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault();
+      const wire = wires.find(w => w.id === selectedWire);
+      if (wire && !wire.locked) {
+        removeWire(selectedWire);
+        setStatus('Wire removed');
+        setTimeout(() => { if (mode === 'idle') setStatus(''); }, 1500);
+      }
+      deselectWire();
+    } else if (e.key === 'Escape') {
+      deselectWire();
+    }
+  });
 
   // -----------------------------------------------------------------------
   // Public API
