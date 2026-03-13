@@ -14,7 +14,7 @@ Silicon Syndicate is a logic puzzle game inspired by Shenzhen I/O. Write tiny as
 
 ---
 
-### [>>> Press Play <<<](https://paulgibeault.github.io/sil-syn/)
+### [>>> Press Play <<<](https://paulgibeault.github.io/si-syn/)
 
 ---
 
