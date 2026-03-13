@@ -12,6 +12,7 @@ import { level05 } from './levels/level05.js';
 import { trainingT1, trainingT2, trainingT3, trainingT4, trainingT5 } from './levels/training.js';
 import { TUTORIAL_PAGES } from './tutorial.js';
 import { createBuilder } from './ui/builder.js';
+import { createCircuitBoard } from './ui/circuit-board.js';
 import { createGuide, runGuideSequence } from './ui/guide.js';
 
 // ---------------------------------------------------------------------------
@@ -31,7 +32,10 @@ const levelMapEl = document.getElementById('level-map');
 const missionTitle = document.getElementById('mission-title');
 const missionDesc = document.getElementById('mission-desc');
 const circuitEl = document.getElementById('circuit');
+const componentTray = document.getElementById('component-tray');
 const builderContainer = document.getElementById('builder-container');
+const builderModal = document.getElementById('builder-modal');
+const builderModalClose = document.getElementById('builder-modal-close');
 const codeError = document.getElementById('code-error');
 const btnRun = document.getElementById('btn-run');
 const btnStep = document.getElementById('btn-step');
@@ -41,7 +45,6 @@ const cycleDisplay = document.getElementById('cycle-display');
 const regAcc = document.getElementById('reg-acc');
 const regDat = document.getElementById('reg-dat');
 const regPc = document.getElementById('reg-pc');
-const regState = document.getElementById('reg-state');
 const waveformEl = document.getElementById('waveform');
 const resultBanner = document.getElementById('result-banner');
 const tutorialOverlay = document.getElementById('tutorial-overlay');
@@ -58,6 +61,7 @@ const tutDots = document.getElementById('tut-dots');
 let currentLevel = null;
 let sim = null;
 let builder = null;
+let board = null;  // circuit board instance
 let guide = null;
 let running = false;
 let runTimer = null;
@@ -121,179 +125,182 @@ function renderLevelMap() {
 }
 
 // ---------------------------------------------------------------------------
-// Circuit board visualization
+// Circuit board setup from level definition
 // ---------------------------------------------------------------------------
 
-// Icons for different component types
-const COMP_ICONS = {
-  light: '\u2B24',     // filled circle (like a bulb)
-  output: '\u25C9',    // circle with dot
-  sensor: '\u2261',    // triple bar (signal)
-  even: '\u25C9',
-  odd: '\u25C9',
-  amplified: '\u25B2',  // triangle (amplifier)
-};
-
-function renderCircuit() {
-  circuitEl.innerHTML = '';
+function setupCircuitBoard() {
   if (!currentLevel) return;
 
-  const circuit = currentLevel.circuit || inferCircuit();
+  const boardConfig = currentLevel.boardConfig || inferBoardConfig();
 
-  // Render: [inputs] → [MCU] → [outputs]
-  for (const input of circuit.inputs) {
-    const comp = makeInputComp(input);
-    comp.id = 'circuit-' + input.id;
-    circuitEl.appendChild(comp);
+  board = createCircuitBoard({
+    container: circuitEl,
+    gridCols: boardConfig.gridCols || 8,
+    gridRows: boardConfig.gridRows || 4,
+    onOpenBuilder: (mcuId) => openBuilderModal(mcuId),
+    onWiringChange: () => {
+      // Wiring changed — user might need to reset sim
+    },
+  });
 
-    const wire = document.createElement('div');
-    wire.className = 'circuit-wire';
-    wire.id = 'wire-in-' + input.id;
-    circuitEl.appendChild(wire);
+  // Place components
+  for (const comp of boardConfig.components) {
+    board.addComponent(
+      comp.type, comp.id, comp.col, comp.row,
+      comp.outputPins || [], comp.inputPins || [],
+      comp.locked ?? true,
+    );
   }
 
-  // MCU chip
-  const mcuPins = (currentLevel.playerMCU.simplePins || []).join(', ');
-  const mcu = document.createElement('div');
-  mcu.className = 'circuit-component mcu-comp';
-  mcu.innerHTML = `<div class="comp-label">MCU</div>` +
-    `<div class="comp-icon on" style="font-size:14px; color:var(--accent)">\u2588\u2588</div>` +
-    `<div class="comp-pin-label">${mcuPins}</div>`;
-  circuitEl.appendChild(mcu);
-
-  for (const output of circuit.outputs) {
-    const wire = document.createElement('div');
-    wire.className = 'circuit-wire';
-    wire.id = 'wire-' + output.id;
-    const wv = document.createElement('span');
-    wv.className = 'wire-value';
-    wire.appendChild(wv);
-    circuitEl.appendChild(wire);
-
-    const comp = makeOutputComp(output);
-    comp.id = 'circuit-' + output.id;
-    circuitEl.appendChild(comp);
-  }
-
-  // Show initial expected values on outputs
-  updateCircuitTargets();
-}
-
-function makeInputComp(input) {
-  const el = document.createElement('div');
-  el.className = 'circuit-component input-comp';
-  const icon = COMP_ICONS[input.id] || COMP_ICONS.sensor;
-  el.innerHTML =
-    `<div class="comp-label">${input.name}</div>` +
-    `<div class="comp-icon on" style="color:var(--cyan)">${icon}</div>` +
-    `<div class="comp-value off">--</div>`;
-  return el;
-}
-
-function makeOutputComp(output) {
-  const el = document.createElement('div');
-  el.className = 'circuit-component output-comp';
-  const icon = COMP_ICONS[output.id] || COMP_ICONS.output;
-  el.innerHTML =
-    `<div class="comp-label">${output.name}</div>` +
-    `<div class="comp-icon off">${icon}</div>` +
-    `<div class="comp-value off">0</div>` +
-    `<div class="comp-target"></div>`;
-  return el;
-}
-
-function updateCircuitTargets() {
-  if (!currentLevel) return;
-  const circuit = currentLevel.circuit || inferCircuit();
-  for (const output of circuit.outputs) {
-    const el = document.getElementById('circuit-' + output.id);
-    if (!el) continue;
-    const targetEl = el.querySelector('.comp-target');
-    if (!targetEl) continue;
-    // Show what the first cycle expects
-    const expected = currentLevel.expected[output.id];
-    if (expected) {
-      const v = expected(1);
-      targetEl.textContent = `needs ${v}`;
+  // Pre-wire
+  if (boardConfig.wires) {
+    for (const w of boardConfig.wires) {
+      const wire = board.addWire(w.from, w.fromPin, w.to, w.toPin);
+      if (wire && w.locked) wire.locked = true;
     }
   }
+
+  // Setup component tray for player-placeable components
+  renderComponentTray(boardConfig);
 }
 
-function inferCircuit() {
-  const inputs = Object.keys(currentLevel.sources || {}).map(id => ({
-    id, name: id.toUpperCase(), pin: id,
-  }));
-  const outputs = Object.keys(currentLevel.expected || {}).map(id => ({
-    id, name: id.toUpperCase(), pin: id,
-  }));
-  return { inputs, outputs };
-}
+function inferBoardConfig() {
+  // Build a reasonable board from old-style level definitions
+  const components = [];
+  const wires = [];
+  const circuit = currentLevel.circuit || {
+    inputs: Object.keys(currentLevel.sources || {}).map(id => ({ id, name: id.toUpperCase(), pin: id })),
+    outputs: Object.keys(currentLevel.expected || {}).map(id => ({ id, name: id.toUpperCase(), pin: id })),
+  };
 
-function updateCircuitValues() {
-  if (!sim || !currentLevel) return;
-  const circuit = currentLevel.circuit || inferCircuit();
-  const cycle = sim.scheduler.cycle;
+  // Place inputs on the left
+  circuit.inputs.forEach((input, i) => {
+    components.push({
+      type: 'sensor', id: input.id, col: 0, row: i * 2,
+      outputPins: [input.pin || input.id], inputPins: [],
+      locked: true,
+    });
+  });
 
-  // Update input values
-  for (const input of circuit.inputs) {
-    const el = document.getElementById('circuit-' + input.id);
-    if (!el) continue;
-    const valEl = el.querySelector('.comp-value');
-    const iconEl = el.querySelector('.comp-icon');
-    if (currentLevel.sources?.[input.id]) {
-      const v = currentLevel.sources[input.id](Math.max(1, cycle));
-      valEl.textContent = v;
-      valEl.className = 'comp-value on';
-      if (iconEl) iconEl.className = 'comp-icon on';
+  // Place MCU in the center
+  const mcuRow = 0;
+  components.push({
+    type: 'mcu', id: currentLevel.playerMCU.id, col: 3, row: mcuRow,
+    outputPins: currentLevel.playerMCU.simplePins || [],
+    inputPins: Object.keys(currentLevel.sources || {}),
+    locked: true,
+  });
+
+  // Place outputs on the right — use the output's own id as the pin id
+  circuit.outputs.forEach((output, i) => {
+    const outType = output.id === 'light' ? 'light' : 'output';
+    components.push({
+      type: outType, id: output.id, col: 6, row: i * 2,
+      outputPins: [], inputPins: [output.id],
+      locked: true,
+    });
+  });
+
+  // Auto-wire based on level wiring definition
+  if (currentLevel.wiring) {
+    for (const w of currentLevel.wiring) {
+      wires.push({
+        from: w.from.mcuId, fromPin: w.from.pin,
+        to: w.to, toPin: w.to,
+        locked: true,
+      });
     }
-
-    // Animate input wire
-    const wire = document.getElementById('wire-in-' + input.id);
-    if (wire) wire.className = 'circuit-wire active';
   }
 
-  // Update output values
-  for (const output of circuit.outputs) {
-    const el = document.getElementById('circuit-' + output.id);
-    if (!el) continue;
-    const valEl = el.querySelector('.comp-value');
-    const iconEl = el.querySelector('.comp-icon');
-    const targetEl = el.querySelector('.comp-target');
-    const v = sim.board.readSimplePin(output.id);
+  // Auto-wire sources to MCU inputs
+  for (const inputId of Object.keys(currentLevel.sources || {})) {
+    wires.push({
+      from: inputId, fromPin: inputId,
+      to: currentLevel.playerMCU.id, toPin: inputId,
+      locked: true,
+    });
+  }
 
-    valEl.textContent = v;
-    valEl.className = 'comp-value' + (v > 0 ? ' on' : ' off');
+  return {
+    gridCols: 8,
+    gridRows: Math.max(4, (circuit.inputs.length + circuit.outputs.length) * 2),
+    components,
+    wires,
+  };
+}
 
-    // Icon brightness scales with value (0-100 range)
-    const brightness = Math.min(1, Math.abs(v) / 100);
-    if (iconEl) {
-      iconEl.className = 'comp-icon' + (brightness > 0.5 ? ' on' : brightness > 0 ? ' dim' : ' off');
-      if (v > 0) {
-        iconEl.style.color = `var(--green)`;
-        el.classList.add('lit');
-      } else {
-        iconEl.style.color = '';
-        el.classList.remove('lit');
-      }
+// ---------------------------------------------------------------------------
+// Component tray
+// ---------------------------------------------------------------------------
+
+function renderComponentTray(boardConfig) {
+  componentTray.innerHTML = '';
+
+  const available = boardConfig.availableComponents || [];
+  if (available.length === 0) {
+    componentTray.style.display = 'none';
+    return;
+  }
+  componentTray.style.display = 'flex';
+
+  const TRAY_ICONS = {
+    mcu: '\u2588\u2588',
+    sensor: '\u2261',
+    light: '\u2B24',
+    output: '\u25C9',
+  };
+  const TRAY_LABELS = {
+    mcu: 'MCU', sensor: 'Sensor', light: 'Light', output: 'Output',
+  };
+
+  for (const item of available) {
+    const btn = document.createElement('button');
+    btn.className = 'tray-item';
+    btn.innerHTML = `<span class="tray-icon">${TRAY_ICONS[item.type] || '?'}</span>${TRAY_LABELS[item.type] || item.type}`;
+
+    // Check if already placed
+    const alreadyPlaced = board.placed.some(c => c.id === item.id);
+    if (alreadyPlaced) {
+      btn.classList.add('placed');
     }
 
-    // Update target display with current cycle expectation
-    if (targetEl && currentLevel.expected[output.id]) {
-      const expected = currentLevel.expected[output.id](Math.max(1, cycle));
-      const match = v === expected;
-      targetEl.textContent = match ? `\u2713 ${expected}` : `needs ${expected}`;
-      targetEl.style.color = match ? 'var(--green)' : 'var(--yellow)';
-    }
+    btn.addEventListener('click', () => {
+      if (board.placed.some(c => c.id === item.id)) return;
+      board.startPlacing(item.type, item.id, item.outputPins || [], item.inputPins || []);
+      btn.classList.add('active');
 
-    // Wire animation with value label
-    const wire = document.getElementById('wire-' + output.id);
-    if (wire) {
-      wire.className = 'circuit-wire' + (v > 0 ? ' active' : '');
-      const wv = wire.querySelector('.wire-value');
-      if (wv) wv.textContent = v > 0 ? v : '';
-    }
+      // Deactivate on place or cancel
+      const check = setInterval(() => {
+        if (board.mode !== 'placing') {
+          clearInterval(check);
+          btn.classList.remove('active');
+          if (board.placed.some(c => c.id === item.id)) {
+            btn.classList.add('placed');
+          }
+        }
+      }, 100);
+    });
+
+    componentTray.appendChild(btn);
   }
 }
+
+// ---------------------------------------------------------------------------
+// Builder modal
+// ---------------------------------------------------------------------------
+
+function openBuilderModal() {
+  builderModal.classList.add('visible');
+}
+
+function closeBuilderModal() {
+  builderModal.classList.remove('visible');
+}
+
+builderModalClose.addEventListener('click', closeBuilderModal);
+builderModal.addEventListener('click', (e) => {
+  if (e.target === builderModal) closeBuilderModal();
+});
 
 // ---------------------------------------------------------------------------
 // Level loading
@@ -309,7 +316,7 @@ function loadLevel(levelId) {
   codeError.style.display = 'none';
 
   renderLevelMap();
-  renderCircuit();
+  setupCircuitBoard();
 
   // Create builder with level-specific constraints
   const pins = currentLevel.playerMCU.simplePins || [];
@@ -405,16 +412,16 @@ function resetSim() {
   stopRun();
   clearError();
 
-  if (currentLevel) setSavedCode(currentLevel.id, builder.getCode());
+  if (currentLevel && builder) setSavedCode(currentLevel.id, builder.getCode());
 
-  const source = builder.getCode();
+  const source = builder ? builder.getCode() : '';
   if (!source.trim()) {
     sim = null;
     updateRegisters(null);
     cycleDisplay.textContent = 'Cycle: 0';
     resultBanner.className = ''; resultBanner.style.display = 'none';
     renderWaveform();
-    renderCircuit();
+    if (board) board.resetValues();
     return;
   }
 
@@ -430,7 +437,7 @@ function resetSim() {
   cycleDisplay.textContent = 'Cycle: 0';
   resultBanner.className = ''; resultBanner.style.display = 'none';
   renderWaveform();
-  renderCircuit();
+  if (board) board.resetValues();
 }
 
 // ---------------------------------------------------------------------------
@@ -440,7 +447,7 @@ function resetSim() {
 function updateRegisters(mcu) {
   if (!mcu) {
     regAcc.textContent = '-'; regDat.textContent = '-';
-    regPc.textContent = '-'; regState.textContent = '-';
+    regPc.textContent = '-';
     regAcc.className = regDat.className = regPc.className = 'reg-val';
     prevRegs = { acc: 0, dat: 0, pc: 0 };
     return;
@@ -450,9 +457,6 @@ function updateRegisters(mcu) {
   regAcc.textContent = acc;
   regDat.textContent = dat;
   regPc.textContent = pc;
-  // Shorten state names
-  const stateNames = { READY: 'RDY', SLEEPING: 'SLP', XBUS_SENDING: 'XBS', XBUS_RECEIVING: 'XBR' };
-  regState.textContent = stateNames[mcu.state] || mcu.state;
 
   regAcc.className = acc !== prevRegs.acc ? 'reg-val changed' : 'reg-val';
   regDat.className = dat !== prevRegs.dat ? 'reg-val changed' : 'reg-val';
@@ -473,7 +477,12 @@ function stepOnce() {
   const mcu = sim.scheduler.mcus[0];
   cycleDisplay.textContent = `Cycle: ${sim.scheduler.cycle}`;
   updateRegisters(mcu);
-  updateCircuitValues();
+
+  // Update circuit board live values
+  if (board) {
+    board.updateValues(sim.board, sim.scheduler.cycle, currentLevel);
+  }
+
   renderWaveform();
 
   // Highlight current instruction in builder
@@ -528,39 +537,84 @@ function renderWaveform() {
   if (!currentLevel) return;
 
   const summary = sim ? sim.verifier.summary : [];
+  const pinIds = Object.keys(currentLevel.expected);
   const maxVal = 100;
+  const barMax = 48; // max bar height in px
 
-  for (let cycle = 1; cycle <= currentLevel.testCycles; cycle++) {
-    const col = document.createElement('div');
-    col.className = 'wave-col';
-    const cycleData = summary.find(s => s.cycle === cycle);
+  for (const pinId of pinIds) {
+    const section = document.createElement('div');
+    section.className = 'wave-pin-section';
 
-    for (const pinId of Object.keys(currentLevel.expected)) {
+    // Pin label on the left
+    const label = document.createElement('div');
+    label.className = 'wave-pin-label';
+    label.textContent = pinId;
+    section.appendChild(label);
+
+    // Track area with columns
+    const track = document.createElement('div');
+    track.className = 'wave-track';
+
+    for (let cycle = 1; cycle <= currentLevel.testCycles; cycle++) {
+      const col = document.createElement('div');
+      col.className = 'wave-col';
+      const cycleData = summary.find(s => s.cycle === cycle);
       const expectedVal = currentLevel.expected[pinId](cycle);
-      const barHeight = Math.max(2, (Math.abs(expectedVal) / maxVal) * 50);
+      const expectedHeight = Math.max(2, (Math.abs(expectedVal) / maxVal) * barMax);
+
+      const barWrap = document.createElement('div');
+      barWrap.className = 'wave-bar-wrap';
 
       if (cycleData && cycleData.pins[pinId]) {
         const { actual, pass } = cycleData.pins[pinId];
-        const actualHeight = Math.max(2, (Math.abs(actual) / maxVal) * 50);
+        const actualHeight = Math.max(2, (Math.abs(actual) / maxVal) * barMax);
+
+        // Actual value bar
         const bar = document.createElement('div');
         bar.className = `wave-bar ${pass ? 'pass' : 'fail'}`;
         bar.style.height = actualHeight + 'px';
-        bar.title = `C${cycle}: got ${actual}, want ${expectedVal}`;
-        col.appendChild(bar);
+        barWrap.appendChild(bar);
+
+        // Expected marker line (only if mismatch)
+        if (!pass) {
+          const marker = document.createElement('div');
+          marker.className = 'wave-expect-marker';
+          marker.style.bottom = expectedHeight + 'px';
+          barWrap.appendChild(marker);
+        }
+
+        // Hover value
+        const tip = document.createElement('div');
+        tip.className = 'wave-value-tip';
+        tip.textContent = actual;
+        barWrap.appendChild(tip);
       } else {
+        // Not yet run — show expected as ghost
         const bar = document.createElement('div');
         bar.className = 'wave-bar expected';
-        bar.style.height = barHeight + 'px';
-        bar.title = `C${cycle}: want ${expectedVal}`;
-        col.appendChild(bar);
+        bar.style.height = expectedHeight + 'px';
+        barWrap.appendChild(bar);
+
+        // Hover value for expected
+        const tip = document.createElement('div');
+        tip.className = 'wave-value-tip';
+        tip.textContent = expectedVal;
+        barWrap.appendChild(tip);
       }
+
+      col.appendChild(barWrap);
+
+      // Cycle number
+      const lbl = document.createElement('div');
+      lbl.className = 'wave-label';
+      lbl.textContent = cycle;
+      col.appendChild(lbl);
+
+      track.appendChild(col);
     }
 
-    const lbl = document.createElement('div');
-    lbl.className = 'wave-label';
-    lbl.textContent = cycle;
-    col.appendChild(lbl);
-    waveformEl.appendChild(col);
+    section.appendChild(track);
+    waveformEl.appendChild(section);
   }
 }
 

@@ -32,6 +32,18 @@ export const trainingT1 = {
     outputs: [{ id: 'light', name: 'LIGHT', pin: 'p0' }],
   },
 
+  boardConfig: {
+    gridCols: 6,
+    gridRows: 3,
+    components: [
+      { type: 'mcu', id: 'mcu0', col: 1, row: 0, outputPins: ['p0'], inputPins: [], locked: true },
+      { type: 'light', id: 'light', col: 4, row: 1, outputPins: [], inputPins: ['light'], locked: true },
+    ],
+    wires: [
+      { from: 'mcu0', fromPin: 'p0', to: 'light', toPin: 'light', locked: true },
+    ],
+  },
+
   allowedOps: ['mov'],
   allowedArgs: ['100', 'p0'],
   maxSlots: 3,
@@ -40,13 +52,13 @@ export const trainingT1 = {
 
   guide: [
     {
-      text: 'See the <strong>LIGHT</strong> above? It shows <strong>"needs 100"</strong>. Your MCU is wired to it through pin <strong>p0</strong>.',
+      text: 'See the <strong>LIGHT</strong>? It shows <strong>"needs 100"</strong>. Your MCU is wired to it through pin <strong>p0</strong>.',
       target: '#circuit',
       position: 'below',
     },
     {
-      text: '<strong>mov</strong> sends a value somewhere. Tap here to build the instruction that sends <strong>100</strong> to <strong>p0</strong>.',
-      target: '.slot-row:first-child .slot-op',
+      text: 'Tap the <strong>MCU</strong> to open the code editor. Use <strong>mov</strong> to send <strong>100</strong> to <strong>p0</strong>.',
+      target: '.cb-comp',
       position: 'below',
     },
   ],
@@ -78,11 +90,24 @@ export const trainingT2 = {
     outputs: [{ id: 'output', name: 'OUTPUT', pin: 'p0' }],
   },
 
+  boardConfig: {
+    gridCols: 8,
+    gridRows: 3,
+    components: [
+      { type: 'sensor', id: 'sensor', col: 0, row: 1, outputPins: ['sensor'], inputPins: [], locked: true },
+      { type: 'mcu', id: 'mcu0', col: 3, row: 0, outputPins: ['p0'], inputPins: ['sensor'], locked: true },
+      { type: 'output', id: 'output', col: 6, row: 1, outputPins: [], inputPins: ['output'], locked: true },
+    ],
+    wires: [
+      { from: 'sensor', fromPin: 'sensor', to: 'mcu0', toPin: 'sensor', locked: true },
+      { from: 'mcu0', fromPin: 'p0', to: 'output', toPin: 'output', locked: true },
+    ],
+  },
+
   allowedOps: ['mov'],
   allowedArgs: ['sensor', 'p0', 'acc'],
   maxSlots: 3,
 
-  // Pre-fill with mov ??? p0 — arg 0 is blank
   prefill: [
     { op: 'mov', args: [null, 'p0'], locked: [false, true] },
   ],
@@ -94,8 +119,8 @@ export const trainingT2 = {
       position: 'below',
     },
     {
-      text: 'The instruction is set to <strong>mov</strong>. Tap the blank to choose <em>where</em> to read from.',
-      target: '.slot-row:first-child .slot-arg',
+      text: 'Tap the <strong>MCU</strong> to edit. The instruction is set to <strong>mov</strong>. Tap the blank to choose <em>where</em> to read from.',
+      target: '.cb-comp',
       position: 'below',
     },
   ],
@@ -126,6 +151,20 @@ export const trainingT3 = {
   circuit: {
     inputs: [{ id: 'sensor', name: 'SENSOR', pin: 'sensor' }],
     outputs: [{ id: 'output', name: 'OUTPUT', pin: 'p0' }],
+  },
+
+  boardConfig: {
+    gridCols: 8,
+    gridRows: 3,
+    components: [
+      { type: 'sensor', id: 'sensor', col: 0, row: 1, outputPins: ['sensor'], inputPins: [], locked: true },
+      { type: 'mcu', id: 'mcu0', col: 3, row: 0, outputPins: ['p0'], inputPins: ['sensor'], locked: true },
+      { type: 'output', id: 'output', col: 6, row: 1, outputPins: [], inputPins: ['output'], locked: true },
+    ],
+    wires: [
+      { from: 'sensor', fromPin: 'sensor', to: 'mcu0', toPin: 'sensor', locked: true },
+      { from: 'mcu0', fromPin: 'p0', to: 'output', toPin: 'output', locked: true },
+    ],
   },
 
   allowedOps: ['mov', 'add'],
@@ -177,6 +216,18 @@ export const trainingT4 = {
     outputs: [{ id: 'light', name: 'LIGHT', pin: 'p0' }],
   },
 
+  boardConfig: {
+    gridCols: 6,
+    gridRows: 3,
+    components: [
+      { type: 'mcu', id: 'mcu0', col: 1, row: 0, outputPins: ['p0'], inputPins: [], locked: true },
+      { type: 'light', id: 'light', col: 4, row: 1, outputPins: [], inputPins: ['light'], locked: true },
+    ],
+    wires: [
+      { from: 'mcu0', fromPin: 'p0', to: 'light', toPin: 'light', locked: true },
+    ],
+  },
+
   allowedOps: ['mov', 'slp', 'jmp'],
   allowedArgs: ['0', '100', 'p0', 'loop'],
   maxSlots: 7,
@@ -226,6 +277,20 @@ export const trainingT5 = {
   circuit: {
     inputs: [{ id: 'sensor', name: 'SENSOR', pin: 'sensor' }],
     outputs: [{ id: 'output', name: 'OUTPUT', pin: 'p0' }],
+  },
+
+  boardConfig: {
+    gridCols: 8,
+    gridRows: 3,
+    components: [
+      { type: 'sensor', id: 'sensor', col: 0, row: 1, outputPins: ['sensor'], inputPins: [], locked: true },
+      { type: 'mcu', id: 'mcu0', col: 3, row: 0, outputPins: ['p0'], inputPins: ['sensor'], locked: true },
+      { type: 'output', id: 'output', col: 6, row: 1, outputPins: [], inputPins: ['output'], locked: true },
+    ],
+    wires: [
+      { from: 'sensor', fromPin: 'sensor', to: 'mcu0', toPin: 'sensor', locked: true },
+      { from: 'mcu0', fromPin: 'p0', to: 'output', toPin: 'output', locked: true },
+    ],
   },
 
   allowedOps: ['mov', 'tgt'],

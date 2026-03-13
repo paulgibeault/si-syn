@@ -33,6 +33,7 @@ export function createGuide({ container }) {
       const rect = target.getBoundingClientRect();
       spotlightEl = document.createElement('div');
       spotlightEl.className = 'guide-spotlight';
+      spotlightEl.style.position = 'fixed';
       spotlightEl.style.top = (rect.top - 4) + 'px';
       spotlightEl.style.left = (rect.left - 4) + 'px';
       spotlightEl.style.width = (rect.width + 8) + 'px';
@@ -49,25 +50,47 @@ export function createGuide({ container }) {
     `;
     overlayEl.appendChild(tooltipEl);
 
-    // Position tooltip relative to target
+    // Position tooltip relative to target, centered horizontally, clamped to viewport
     container.appendChild(overlayEl);
 
     if (target) {
       const rect = target.getBoundingClientRect();
-      const contRect = container.getBoundingClientRect();
+      const vh = window.innerHeight;
+      const vw = window.innerWidth;
+      const tooltipW = tooltipEl.offsetWidth || 280;
+      const tooltipH = tooltipEl.offsetHeight || 120;
+      const margin = 16;
+      const gap = 14;
 
-      if (position === 'below') {
-        tooltipEl.style.top = (rect.bottom + 12 - contRect.top) + 'px';
-        tooltipEl.style.left = Math.max(8, Math.min(
-          rect.left - contRect.left,
-          contRect.width - 280
-        )) + 'px';
-      } else if (position === 'above') {
-        tooltipEl.style.bottom = (contRect.bottom - rect.top + 12) + 'px';
-        tooltipEl.style.left = Math.max(8, rect.left - contRect.left) + 'px';
+      // Center tooltip horizontally on the target
+      let left = rect.left + rect.width / 2 - tooltipW / 2;
+      // Clamp to viewport edges
+      left = Math.max(margin, Math.min(left, vw - tooltipW - margin));
+
+      let top;
+      if (position === 'above') {
+        top = rect.top - tooltipH - gap;
+      } else {
+        // default: below
+        top = rect.bottom + gap;
       }
+
+      // If tooltip would go off the bottom, flip to above
+      if (top + tooltipH > vh - margin) {
+        top = rect.top - tooltipH - gap;
+      }
+      // If still off the top, center vertically
+      if (top < margin) {
+        top = Math.max(margin, (vh - tooltipH) / 2);
+      }
+
+      tooltipEl.style.position = 'fixed';
+      tooltipEl.style.top = top + 'px';
+      tooltipEl.style.left = left + 'px';
     } else {
-      // Center in container
+      // No target — center in viewport, add dim background to overlay
+      overlayEl.style.background = 'rgba(0,0,0,0.65)';
+      tooltipEl.style.position = 'fixed';
       tooltipEl.style.top = '50%';
       tooltipEl.style.left = '50%';
       tooltipEl.style.transform = 'translate(-50%, -50%)';
