@@ -666,4 +666,9 @@ btnReset.addEventListener('click', resetSim);
 // Init
 // ---------------------------------------------------------------------------
 
-loadLevel(LEVELS[0].id);
+// Defer to ensure layout is computed (iOS Safari needs a paint cycle first)
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+    loadLevel(LEVELS[0].id);
+  });
+});
