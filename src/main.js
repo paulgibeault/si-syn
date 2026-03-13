@@ -98,13 +98,8 @@ function isLevelPassed(id) { return loadSavedData().passed?.[id] === true; }
 function renderLevelMap() {
   levelMapEl.innerHTML = '';
 
-  LEVELS.forEach((level, i) => {
-    if (i > 0) {
-      const wire = document.createElement('div');
-      wire.className = 'level-wire' + (isLevelPassed(LEVELS[i - 1].id) ? ' passed' : '');
-      levelMapEl.appendChild(wire);
-    }
-
+  // Create nodes
+  LEVELS.forEach((level) => {
     const node = document.createElement('div');
     node.className = 'level-node' + (currentLevel === level ? ' active' : '');
 
@@ -122,6 +117,29 @@ function renderLevelMap() {
 
     node.addEventListener('click', () => loadLevel(level.id));
     levelMapEl.appendChild(node);
+  });
+
+  // Draw connecting line segments after layout
+  requestAnimationFrame(() => {
+    const lineContainer = document.createElement('div');
+    lineContainer.id = 'level-map-line';
+    levelMapEl.appendChild(lineContainer);
+
+    const nodes = levelMapEl.querySelectorAll('.level-node');
+    const mapRect = levelMapEl.getBoundingClientRect();
+
+    for (let i = 0; i < nodes.length - 1; i++) {
+      const dotA = nodes[i].querySelector('.level-dot');
+      const dotB = nodes[i + 1].querySelector('.level-dot');
+      const rA = dotA.getBoundingClientRect();
+      const rB = dotB.getBoundingClientRect();
+
+      const seg = document.createElement('div');
+      seg.className = 'level-line-seg' + (isLevelPassed(LEVELS[i].id) ? ' passed' : '');
+      seg.style.left = (rA.right - mapRect.left) + 'px';
+      seg.style.width = (rB.left - rA.right) + 'px';
+      lineContainer.appendChild(seg);
+    }
   });
 }
 

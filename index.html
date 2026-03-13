@@ -91,20 +91,41 @@
 
     /* --- Level Map: compact horizontal strip --- */
     #level-map {
+      position: relative;
       display: flex;
       padding: 6px 12px 4px;
       background: var(--board);
       border-bottom: 1px solid var(--border);
       flex-shrink: 0;
       overflow-x: auto;
-      align-items: flex-start;
+      justify-content: center;
+      gap: 0;
     }
+    /* Continuous line behind the dots */
+    #level-map-line {
+      position: absolute;
+      top: 18px; /* 6px padding + 12px (half dot) */
+      left: 0;
+      right: 0;
+      height: 2px;
+      pointer-events: none;
+    }
+    .level-line-seg {
+      position: absolute;
+      height: 2px;
+      background: var(--border);
+    }
+    .level-line-seg.passed { background: var(--green); }
     .level-node {
       display: flex;
       flex-direction: column;
       align-items: center;
       cursor: pointer;
-      flex-shrink: 0;
+      flex: 1;
+      min-width: 40px;
+      max-width: 72px;
+      position: relative;
+      z-index: 1;
     }
     .level-dot {
       width: 24px; height: 24px;
@@ -127,19 +148,12 @@
       color: var(--green);
       background: #1a3320;
     }
-    .level-wire {
-      width: 12px; height: 2px;
-      background: var(--border);
-      flex-shrink: 0;
-      margin-top: 11px; /* half of dot height (24/2 - 1) to center on dot */
-    }
-    .level-wire.passed { background: var(--green); }
     .level-label {
       font-size: 7px;
       color: var(--dim);
       margin-top: 2px;
       text-align: center;
-      max-width: 44px;
+      max-width: 52px;
       line-height: 1.1;
     }
     .level-node.active .level-label { color: var(--accent); }
