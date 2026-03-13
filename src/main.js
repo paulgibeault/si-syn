@@ -663,12 +663,34 @@ btnStep.addEventListener('click', () => {
 btnReset.addEventListener('click', resetSim);
 
 // ---------------------------------------------------------------------------
+// Debug: show errors visually (for mobile debugging)
+// ---------------------------------------------------------------------------
+
+function showFatalError(msg) {
+  const el = document.createElement('div');
+  el.style.cssText = 'position:fixed;top:0;left:0;right:0;padding:12px;background:#331a1a;color:#f07178;font:12px monospace;z-index:9999;white-space:pre-wrap;word-break:break-all;max-height:40vh;overflow:auto;';
+  el.textContent = msg;
+  document.body.appendChild(el);
+}
+
+window.addEventListener('error', (e) => {
+  showFatalError(`ERROR: ${e.message}\nat ${e.filename}:${e.lineno}:${e.colno}`);
+});
+window.addEventListener('unhandledrejection', (e) => {
+  showFatalError(`UNHANDLED: ${e.reason}`);
+});
+
+// ---------------------------------------------------------------------------
 // Init
 // ---------------------------------------------------------------------------
 
 // Defer to ensure layout is computed (iOS Safari needs a paint cycle first)
 requestAnimationFrame(() => {
   requestAnimationFrame(() => {
-    loadLevel(LEVELS[0].id);
+    try {
+      loadLevel(LEVELS[0].id);
+    } catch (e) {
+      showFatalError(`LOAD ERROR: ${e.message}\n${e.stack}`);
+    }
   });
 });
