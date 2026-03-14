@@ -32,6 +32,8 @@ const levelMapEl = document.getElementById('level-map');
 const missionTitle = document.getElementById('mission-title');
 const missionDesc = document.getElementById('mission-desc');
 const circuitEl = document.getElementById('circuit');
+const missionHint = document.getElementById('mission-hint');
+const hintText = document.getElementById('hint-text');
 const componentTray = document.getElementById('component-tray');
 const builderContainer = document.getElementById('builder-container');
 const builderModal = document.getElementById('builder-modal');
@@ -336,6 +338,12 @@ function loadLevel(levelId) {
 
   missionTitle.textContent = currentLevel.name;
   missionDesc.textContent = currentLevel.description;
+  if (currentLevel.hint) {
+    hintText.textContent = currentLevel.hint;
+    missionHint.classList.add('visible');
+  } else {
+    missionHint.classList.remove('visible');
+  }
   codeError.style.display = 'none';
 
   renderLevelMap();

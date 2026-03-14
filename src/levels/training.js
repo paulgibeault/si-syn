@@ -183,11 +183,6 @@ export const trainingT3 = {
       target: '#circuit',
       position: 'below',
     },
-    {
-      text: 'Something needs to happen in the middle. Tap to add an instruction that increases <strong>acc</strong>.',
-      target: '.slot-row:nth-child(2) .slot-op',
-      position: 'below',
-    },
   ],
 };
 

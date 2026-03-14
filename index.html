@@ -176,7 +176,28 @@
       letter-spacing: 1px;
       white-space: nowrap;
     }
-    #mission-desc { color: var(--dim); font-size: 11px; }
+    #mission-desc { color: var(--green); font-size: 11px; }
+    #mission-hint {
+      display: none;
+      padding: 5px 12px;
+      background: rgba(230, 180, 80, 0.08);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    #mission-hint.visible { display: flex; align-items: baseline; gap: 6px; }
+    #mission-hint .hint-label {
+      color: var(--yellow);
+      font-size: 10px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      white-space: nowrap;
+    }
+    #mission-hint .hint-text {
+      color: var(--yellow);
+      font-size: 11px;
+      opacity: 0.85;
+    }
 
     /* --- Component Tray (when level needs placement) --- */
     #component-tray {
@@ -973,6 +994,11 @@
   <div id="mission">
     <div id="mission-title"></div>
     <div id="mission-desc"></div>
+  </div>
+
+  <div id="mission-hint">
+    <span class="hint-label">Hint</span>
+    <span class="hint-text" id="hint-text"></span>
   </div>
 
   <div id="component-tray"></div>

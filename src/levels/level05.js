@@ -46,7 +46,7 @@ export const level05 = {
     },
   },
 
-  hint: 'Repeatedly subtract 2 from acc to test even/odd. If acc reaches 0 it is even; if it reaches -1 (or below 0) it is odd.',
+  hint: "There's no shortcut for this one. Think about what happens to a number when you keep reducing it — where it lands tells you something about it.",
 
   playerMCU: {
     id: 'mcu0',
