@@ -148,6 +148,19 @@
       color: var(--green);
       background: #1a3320;
     }
+    .level-dot.locked {
+      border-color: var(--border);
+      color: var(--dim);
+      background: var(--bg);
+      opacity: 0.4;
+      font-size: 9px;
+    }
+    .level-node.locked-node {
+      opacity: 0.5;
+      pointer-events: none;
+      cursor: default;
+    }
+    .level-node.locked-node .level-label { color: var(--dim); opacity: 0.5; }
     .level-label {
       font-size: 7px;
       color: var(--dim);
@@ -433,6 +446,13 @@
     .reg-name { color: var(--dim); text-transform: uppercase; }
     .reg-val { color: var(--accent); font-weight: bold; }
     .reg-val.changed { color: var(--yellow); }
+    .reg-pulse {
+      animation: reg-flash 0.4s ease-out;
+    }
+    @keyframes reg-flash {
+      0%   { background: rgba(230,180,80,0.3); border-radius: 3px; }
+      100% { background: transparent; }
+    }
     /* --- Waveform / Signal Monitor — semi-transparent overlay on board --- */
     #waveform-section {
       position: absolute;
@@ -895,6 +915,67 @@
       width: 100%;
     }
     .guide-dismiss:active { background: var(--border); }
+
+    /* --- Boot Sequence Overlay --- */
+    #boot-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 300;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Courier New', monospace;
+      transition: opacity 0.6s ease;
+    }
+    #boot-overlay.boot-fade-out {
+      opacity: 0;
+      pointer-events: none;
+    }
+    #boot-terminal {
+      width: min(480px, 90vw);
+      min-height: 200px;
+      max-height: 70vh;
+      overflow: hidden;
+      padding: 20px;
+      border: 1px solid #1a3a2a;
+      background: rgba(0, 8, 0, 0.95);
+      border-radius: 4px;
+      box-shadow: 0 0 40px rgba(0, 100, 0, 0.2), inset 0 0 40px rgba(0,0,0,0.5);
+    }
+    #boot-output {
+      color: #00cc44;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+    .boot-line {
+      display: block;
+      white-space: pre;
+      min-height: 1.7em;
+    }
+    #boot-cursor {
+      display: inline-block;
+      color: #00cc44;
+      animation: cursor-blink 0.8s step-end infinite;
+    }
+    @keyframes cursor-blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+    #boot-skip {
+      margin-top: 16px;
+      color: #1a4a2a;
+      font-size: 11px;
+      font-family: 'Courier New', monospace;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      animation: skip-pulse 2s ease-in-out infinite;
+    }
+    @keyframes skip-pulse {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 0.9; }
+    }
 
     /* --- Tutorial / Reference overlay (centered card) --- */
     #tutorial-overlay {
