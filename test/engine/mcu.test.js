@@ -178,6 +178,29 @@ describe('TEQ / TGT', () => {
     stepMCU(mcu, board);
     expect(mcu.condFlag).toBe(false);
   });
+  it('teq compares two non-acc values (dat vs literal)', () => {
+    // teq dat 7 — tests dat register directly, not acc
+    const mcu = makeMCU('mov 7 dat\nteq dat 7');
+    const board = makeBoard();
+    stepMCU(mcu, board);
+    expect(mcu.condFlag).toBe(true);
+  });
+
+  it('tgt compares two arbitrary values (dat > literal)', () => {
+    const mcu = makeMCU('mov 10 dat\ntgt dat 3');
+    const board = makeBoard();
+    stepMCU(mcu, board);
+    expect(mcu.condFlag).toBe(true);
+  });
+
+  it('tgt first arg can be a literal', () => {
+    // tgt 5 3 → 5 > 3 → true
+    const mcu = makeMCU('tgt 5 3');
+    const board = makeBoard();
+    stepMCU(mcu, board);
+    expect(mcu.condFlag).toBe(true);
+  });
+
 });
 
 // ---------------------------------------------------------------------------

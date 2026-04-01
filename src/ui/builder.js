@@ -16,8 +16,8 @@ const OPS = {
   add: { args: 1, hint: 'Add to acc',         argHints: ['value'] },
   sub: { args: 1, hint: 'Subtract from acc',  argHints: ['value'] },
   mul: { args: 1, hint: 'Multiply acc',       argHints: ['value'] },
-  teq: { args: 1, hint: 'Test if equal',      argHints: ['compare to'] },
-  tgt: { args: 1, hint: 'Test if greater',    argHints: ['compare to'] },
+  teq: { args: 2, hint: 'Test if equal',      argHints: ['value a', 'value b'] },
+  tgt: { args: 2, hint: 'Test if greater',    argHints: ['value a', 'value b'] },
   slp: { args: 1, hint: 'Sleep N cycles',     argHints: ['cycles'] },
   jmp: { args: 1, hint: 'Jump to label',      argHints: ['label'] },
   djt: { args: 1, hint: 'Jump if true',       argHints: ['label'] },
@@ -409,12 +409,8 @@ export function createBuilder({
       if (slot.cond === true) line += '+ ';
       else if (slot.cond === false) line += '- ';
 
-      if ((slot.op === 'teq' || slot.op === 'tgt') && slot.args.length === 1) {
-        line += slot.op + ' acc ' + (slot.args[0] ?? '0');
-      } else {
-        const args = slot.args.map(a => a ?? '0');
-        line += slot.op + (args.length ? ' ' + args.join(' ') : '');
-      }
+      const args = slot.args.map(a => a ?? '0');
+      line += slot.op + (args.length ? ' ' + args.join(' ') : '');
       lines.push(line);
     }
     return lines.join('\n');
@@ -448,7 +444,12 @@ export function createBuilder({
       if (OPS[lower]) {
         slots[slotIdx].cond = cond;
         slots[slotIdx].op = lower;
-        slots[slotIdx].args = args;
+        // Backward-compat: old saved programs used 1-arg teq/tgt with implicit acc
+        let resolvedArgs = args;
+        if ((lower === 'teq' || lower === 'tgt') && args.length === 1) {
+          resolvedArgs = ['acc', args[0]];
+        }
+        slots[slotIdx].args = resolvedArgs;
         slotIdx++;
       }
     }
