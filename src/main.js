@@ -12,7 +12,7 @@ import { level05 } from './levels/level05.js';
 import { level06 } from './levels/level06.js';
 import { level07 } from './levels/level07.js';
 import { level08 } from './levels/level08.js';
-import { trainingT1, trainingT2, trainingT3, trainingT4, trainingT5,
+import { trainingT1,
          bootB1, bootB2, bootB3, bootB4, bootB5, bootB6 } from './levels/training.js';
 import { TUTORIAL_PAGES } from './tutorial.js';
 import { showBootCinematic, showTrainingComplete } from './ui/boot.js';
@@ -25,7 +25,7 @@ import { createGuide, runGuideSequence } from './ui/guide.js';
 // ---------------------------------------------------------------------------
 
 const BOOT_LEVELS = [bootB1, bootB2, bootB3, bootB4, bootB5, bootB6];
-const TRAINING_LEVELS = [trainingT1, trainingT2, trainingT3, trainingT4, trainingT5];
+const TRAINING_LEVELS = [trainingT1];
 const PUZZLE_LEVELS = [level01, level02, level03, level04, level05, level06, level07, level08];
 
 const LEVELS = [...BOOT_LEVELS, ...TRAINING_LEVELS, ...PUZZLE_LEVELS];
@@ -372,6 +372,10 @@ builderModalClear.addEventListener('click', () => {
 
 function loadLevel(levelId) {
   stopRun();
+  resultBanner.className = '';
+  resultBanner.style.display = 'none';
+  const oldPrompt = document.getElementById('next-challenge');
+  if (oldPrompt) oldPrompt.remove();
   currentLevel = LEVELS.find(l => l.id === levelId);
   if (!currentLevel) return;
 
@@ -380,8 +384,10 @@ function loadLevel(levelId) {
   if (currentLevel.hint) {
     hintText.textContent = currentLevel.hint;
     missionHint.classList.add('visible');
+    missionHint.classList.add('collapsed');
   } else {
     missionHint.classList.remove('visible');
+    missionHint.classList.remove('collapsed');
   }
   codeError.style.display = 'none';
 
@@ -660,9 +666,7 @@ function showResult() {
     const wasAlreadyPassed = isLevelPassed(currentLevel.id);
     markLevelPassed(currentLevel.id);
     renderLevelMap();
-    if (!wasAlreadyPassed) {
-      onLevelPassed(currentLevel.id);
-    }
+    onLevelPassed(currentLevel.id, wasAlreadyPassed);
   } else {
     resultBanner.textContent = 'SIGNAL MISMATCH';
     resultBanner.className = 'fail';
@@ -825,19 +829,29 @@ btnStep.addEventListener('click', () => {
   stepOnce();
 });
 btnReset.addEventListener('click', resetSim);
+missionHint.addEventListener('click', () => {
+  missionHint.classList.toggle('collapsed');
+});
 
 // ---------------------------------------------------------------------------
 // Boot training: auto-advance through B1-B6 and mark complete
 // ---------------------------------------------------------------------------
 
-function onLevelPassed(levelId) {
+function advanceToNextLevel() {
+  const idx = LEVELS.findIndex(l => l.id === currentLevel.id);
+  if (idx < LEVELS.length - 1) {
+    loadLevel(LEVELS[idx + 1].id);
+  }
+}
+
+function onLevelPassed(levelId, wasAlreadyPassed) {
   const bIdx = BOOT_LEVELS.findIndex(l => l.id === levelId);
-  if (bIdx !== -1 && bIdx < BOOT_LEVELS.length - 1) {
-    // Auto-advance to next boot lesson
+  if (!wasAlreadyPassed && bIdx !== -1 && bIdx < BOOT_LEVELS.length - 1) {
+    // Auto-advance to next boot lesson (first time only)
     setTimeout(() => loadLevel(BOOT_LEVELS[bIdx + 1].id), 800);
     return;
   }
-  if (bIdx === BOOT_LEVELS.length - 1) {
+  if (!wasAlreadyPassed && bIdx === BOOT_LEVELS.length - 1) {
     // Last boot lesson — show training complete screen then load level 01
     setTimeout(() => {
       setBootComplete();
@@ -847,7 +861,23 @@ function onLevelPassed(levelId) {
         loadLevel(TRAINING_LEVELS[0].id);
       });
     }, 600);
+    return;
   }
+  // Boot replays also fall through here
+  // Training & puzzle levels: show next-challenge prompt below banner
+  const idx = LEVELS.findIndex(l => l.id === levelId);
+  const nextLevel = idx < LEVELS.length - 1 ? LEVELS[idx + 1] : null;
+  if (!nextLevel) return;
+
+  const prompt = document.createElement('div');
+  prompt.id = 'next-challenge';
+  prompt.innerHTML = `<span class="next-label">${nextLevel.name}</span> <span class="next-arrow">\u25B6</span>`;
+  prompt.addEventListener('click', () => {
+    prompt.remove();
+    advanceToNextLevel();
+  });
+  // Place it below the banner inside #game-area
+  document.getElementById('game-area').appendChild(prompt);
 }
 
 // ---------------------------------------------------------------------------
