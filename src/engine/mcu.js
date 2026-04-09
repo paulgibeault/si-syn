@@ -64,10 +64,12 @@ export function parseProgram(source) {
  * @returns {MCU}
  */
 export function createMCU({ id, source = '', simplePins = [], xbusPins = [] }) {
+  const program = parseProgram(source);
   return {
     id,
     source,
-    program: parseProgram(source),
+    program,
+    labelMap: buildLabelMap(program),
     registers: { acc: 0, dat: 0 },
     pc: 0,
     state: MCUState.READY,
@@ -261,7 +263,7 @@ export function stepMCU(mcu, board) {
   if (mcu.state === MCUState.READY) {
     if (mcu.program.length === 0) return mcu.state;
 
-    const labelMap = buildLabelMap(mcu.program);
+    const labelMap = mcu.labelMap;
     const maxInstructions = mcu.program.length * 2; // safety limit
     let executed = 0;
 
