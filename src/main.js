@@ -75,8 +75,17 @@ let currentBoardConfig = null; // for readiness checks
 let guide = null;
 let running = false;
 let runTimer = null;
-let tutorialPage = 0;
-let prevRegs = { acc: 0, dat: 0, pc: 0 };
+let lastTickTime = 0;
+const TICK_INTERVAL = 200;
+
+function runLoop(timestamp) {
+  if (!running) return;
+  if (timestamp - lastTickTime >= TICK_INTERVAL) {
+    stepOnce();
+    lastTickTime = timestamp;
+  }
+  if (running) runTimer = requestAnimationFrame(runLoop);
+}
 
 // ---------------------------------------------------------------------------
 // localStorage persistence
@@ -325,13 +334,18 @@ function renderComponentTray(boardConfig) {
 
     btn.addEventListener('click', () => {
       if (board.placed.some(c => c.id === item.id)) return;
+      
+      // Prevent multiple intervals on the same button
+      if (btn._trayTimer) clearInterval(btn._trayTimer);
+
       board.startPlacing(item.type, item.id, item.outputPins || [], item.inputPins || []);
       btn.classList.add('active');
 
       // Deactivate on place or cancel
-      const check = setInterval(() => {
+      btn._trayTimer = setInterval(() => {
         if (board.mode !== 'placing') {
-          clearInterval(check);
+          clearInterval(btn._trayTimer);
+          btn._trayTimer = null;
           btn.classList.remove('active');
           if (board.placed.some(c => c.id === item.id)) {
             btn.classList.add('placed');
@@ -649,15 +663,13 @@ function startRun() {
   btnRun.textContent = 'Stop';
   btnRun.className = 'btn-stop';
 
-  runTimer = setInterval(() => {
-    stepOnce();
-    if (!running) clearInterval(runTimer);
-  }, 200);
+  lastTickTime = performance.now();
+  runTimer = requestAnimationFrame(runLoop);
 }
 
 function stopRun() {
   running = false;
-  if (runTimer) { clearInterval(runTimer); runTimer = null; }
+  if (runTimer) { cancelAnimationFrame(runTimer); runTimer = null; }
   if (builder) builder.clearHighlight();
   updateRunButton();
 }
