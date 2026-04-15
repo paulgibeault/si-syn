@@ -125,6 +125,7 @@ function clamp(v) { return Math.max(-999, Math.min(999, Math.round(v))); }
 
 const INSTRUCTIONS = {
   MOV(mcu, board, args, labelMap) {
+    if (args.length < 2) throw new Error('mov requires 2 arguments (source, destination)');
     const [src, dest] = args;
     // XBus receive: source is an XBus pin
     if (src in mcu.xbusPins) {
@@ -144,31 +145,37 @@ const INSTRUCTIONS = {
   },
 
   ADD(mcu, board, args) {
+    if (args.length < 1) throw new Error('add requires 1 argument');
     mcu.registers.acc = clamp(mcu.registers.acc + readValue(mcu, board, args[0]));
     mcu.pc++;
   },
 
   SUB(mcu, board, args) {
+    if (args.length < 1) throw new Error('sub requires 1 argument');
     mcu.registers.acc = clamp(mcu.registers.acc - readValue(mcu, board, args[0]));
     mcu.pc++;
   },
 
   MUL(mcu, board, args) {
+    if (args.length < 1) throw new Error('mul requires 1 argument');
     mcu.registers.acc = clamp(mcu.registers.acc * readValue(mcu, board, args[0]));
     mcu.pc++;
   },
 
   TEQ(mcu, board, args) {
+    if (args.length < 2) throw new Error('teq requires 2 arguments');
     mcu.condFlag = readValue(mcu, board, args[0]) === readValue(mcu, board, args[1]);
     mcu.pc++;
   },
 
   TGT(mcu, board, args) {
+    if (args.length < 2) throw new Error('tgt requires 2 arguments');
     mcu.condFlag = readValue(mcu, board, args[0]) > readValue(mcu, board, args[1]);
     mcu.pc++;
   },
 
   SLP(mcu, board, args) {
+    if (args.length < 1) throw new Error('slp requires 1 argument');
     const cycles = Math.max(1, Math.round(readValue(mcu, board, args[0])));
     // slp N: sleep for N additional ticks. The tick where slp executes
     // already ran instructions (batch), so pin values are set.
@@ -179,6 +186,7 @@ const INSTRUCTIONS = {
   },
 
   JMP(mcu, board, args, labelMap) {
+    if (args.length < 1) throw new Error('jmp requires 1 argument');
     const target = labelMap[args[0].toLowerCase()];
     if (target === undefined) throw new Error(`Unknown label: ${args[0]}`);
     mcu.pc = target;
@@ -186,6 +194,7 @@ const INSTRUCTIONS = {
 
   // Conditional jump: only jumps if condFlag is true (+)
   DJT(mcu, board, args, labelMap) {
+    if (args.length < 1) throw new Error('djt requires 1 argument');
     if (mcu.condFlag === true) {
       const target = labelMap[args[0].toLowerCase()];
       if (target === undefined) throw new Error(`Unknown label: ${args[0]}`);
@@ -197,6 +206,7 @@ const INSTRUCTIONS = {
 
   // Conditional jump: only jumps if condFlag is false (-)
   DJF(mcu, board, args, labelMap) {
+    if (args.length < 1) throw new Error('djf requires 1 argument');
     if (mcu.condFlag === false) {
       const target = labelMap[args[0].toLowerCase()];
       if (target === undefined) throw new Error(`Unknown label: ${args[0]}`);
