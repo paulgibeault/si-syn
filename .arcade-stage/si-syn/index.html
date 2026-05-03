@@ -16,7 +16,7 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="apple-touch-icon" sizes="167x167" href="apple-touch-icon-167.png">
   <link rel="apple-touch-icon" sizes="152x152" href="apple-touch-icon-152.png">
-  <script src="https://paulgibeault.github.io/arcade-sdk.js"></script>
+  <script src="http://127.0.0.1:4791/arcade-sdk.js"></script>
   <script>
     // Boot the Arcade SDK before any game code reads storage.
     Arcade.init({ gameId: 'si-syn' });
@@ -1284,6 +1284,7 @@
       .tutorial-dots { gap: 10px; }
     }
   </style>
+  <script type="module" crossorigin src="/si-syn/assets/index-iEdJmsg0.js"></script>
 </head>
 <body>
   <header>
@@ -1382,6 +1383,5 @@
       btnDown.addEventListener('click', function () { setLocal(Math.max(getLocal() - 0.1, 0.5)); });
     })();
   </script>
-  <script type="module" src="/src/main.js"></script>
 </body>
 </html>
