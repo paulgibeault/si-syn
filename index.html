@@ -42,14 +42,15 @@
       try { localStorage.removeItem('si-syn-text-scale'); } catch (e) {}
     });
 
-    // Effective text scale = local user choice (A+/A-) × launcher fontScale.
+    // Effective text scale = base density × local user choice (A+/A-) × launcher fontScale.
     // Set it before first paint so font sizing is correct without a flash.
     (function () {
+      var BASE_SCALE = 0.85;
       function apply() {
         var local = Arcade.state.get('textScale');
         if (typeof local !== 'number' || !isFinite(local)) local = 1;
         var arcadeScale = Arcade.settings.fontScale();
-        document.documentElement.style.setProperty('--text-scale', String(local * arcadeScale));
+        document.documentElement.style.setProperty('--text-scale', String(BASE_SCALE * local * arcadeScale));
       }
       apply();
       Arcade.onSettingsChange(apply);
