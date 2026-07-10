@@ -83,6 +83,12 @@ npm run build
 
 🚧 **Early development** — core engine and puzzle format complete. More levels and polish in progress.
 
+## Arcade launcher integration
+
+Silicon Syndicate has a fixed dark-terminal aesthetic and does not support the
+launcher's theme switching — `Arcade.settings.theme()` is intentionally
+ignored. It does honor `fontScale` and `reducedMotion`.
+
 ---
 
 *Built by Paul Gibeault — because programming puzzles are better when the computer is a 4-pin microcontroller.*

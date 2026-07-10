@@ -18,10 +18,10 @@ import { level08 } from './levels/level08.js';
 import { trainingT1,
          bootB1, bootB2, bootB3, bootB4, bootB5, bootB6 } from './levels/training.js';
 import { TUTORIAL_PAGES } from './tutorial.js';
-import { showBootCinematic, showTrainingComplete } from './ui/boot.js';
+import { showBootCinematic, showTrainingComplete, suspendBootOverlay } from './ui/boot.js';
 import { createBuilder } from './ui/builder.js';
 import { createCircuitBoard } from './ui/circuit-board.js';
-import { createGuide, runGuideSequence } from './ui/guide.js';
+import { createGuide, runGuideSequence, pauseGuideSequence, resumeGuideSequence } from './ui/guide.js';
 
 // ---------------------------------------------------------------------------
 // Level registry — training first, then puzzles
@@ -80,7 +80,36 @@ let running = false;
 let runTimer = null;
 let lastTickTime = 0;
 let prevRegs = { acc: 0, dat: 0, pc: 0 };
+let suspended = false;
 const TICK_INTERVAL = 200;
+
+// ---------------------------------------------------------------------------
+// Suspend-safe timeouts — short one-shot UI-pacing delays (auto-advance,
+// guide start) get paused on Arcade.onSuspend so they don't fire on a
+// hidden tab, then fire immediately on resume instead of being lost.
+// ---------------------------------------------------------------------------
+
+const pendingTimeouts = new Set(); // { id, fn }
+
+function scheduleTimeout(fn, delay) {
+  const entry = { id: null, fn };
+  entry.id = setTimeout(() => {
+    pendingTimeouts.delete(entry);
+    fn();
+  }, delay);
+  pendingTimeouts.add(entry);
+  return entry;
+}
+
+function pauseTimeouts() {
+  for (const entry of pendingTimeouts) clearTimeout(entry.id);
+}
+
+function resumeTimeouts() {
+  const entries = [...pendingTimeouts];
+  pendingTimeouts.clear();
+  for (const entry of entries) entry.fn();
+}
 
 function runLoop(timestamp) {
   if (!running) return;
@@ -346,6 +375,7 @@ function renderComponentTray(boardConfig) {
 
       // Deactivate on place or cancel
       btn._trayTimer = setInterval(() => {
+        if (suspended) return; // avoid churning while the tab is hidden
         if (board.mode !== 'placing') {
           clearInterval(btn._trayTimer);
           btn._trayTimer = null;
@@ -444,7 +474,7 @@ function loadLevel(levelId) {
 
   // Run guide for training levels
   if (currentLevel.guide && !isLevelPassed(levelId)) {
-    setTimeout(() => {
+    scheduleTimeout(() => {
       if (!guide) guide = createGuide({ container: document.body });
       runGuideSequence(guide, currentLevel.guide);
     }, 500);
@@ -880,18 +910,18 @@ function onLevelPassed(levelId, wasAlreadyPassed) {
   const bIdx = BOOT_LEVELS.findIndex(l => l.id === levelId);
   if (!wasAlreadyPassed && bIdx !== -1 && bIdx < BOOT_LEVELS.length - 1) {
     // Auto-advance to next boot lesson (first time only)
-    setTimeout(() => loadLevel(BOOT_LEVELS[bIdx + 1].id), 800);
+    scheduleTimeout(() => loadLevel(BOOT_LEVELS[bIdx + 1].id), 800);
     return;
   }
   if (!wasAlreadyPassed && bIdx === BOOT_LEVELS.length - 1) {
     // Last boot lesson — show training complete screen then load level 01
-    setTimeout(() => {
+    scheduleTimeout(() => {
       setBootComplete();
       showTrainingComplete(() => {
         // Mark all boot levels complete in the map
         renderLevelMap();
         loadLevel(TRAINING_LEVELS[0].id);
-      });
+      }, { reducedMotion: Arcade.settings.reducedMotion() });
     }, 600);
     return;
   }
@@ -920,17 +950,31 @@ let wasRunningOnSuspend = false;
 Arcade.onSuspend(() => {
   wasRunningOnSuspend = running;
   if (running) stopRun();
+  suspended = true;
+  pauseTimeouts();
+  pauseGuideSequence();
+  suspendBootOverlay();
 });
 Arcade.onResume(() => {
+  suspended = false;
+  resumeTimeouts();
+  resumeGuideSequence();
   if (wasRunningOnSuspend) {
     wasRunningOnSuspend = false;
     startRun();
   }
 });
 Arcade.onStateReplaced(() => {
-  // Re-read everything from storage and rebuild the UI.
-  if (currentLevel) loadLevel(currentLevel.id);
-  else renderLevelMap();
+  // Re-read everything from storage and rebuild the UI — treat this like a
+  // fresh boot, since the imported save may have locked the level we were on.
+  if (!currentLevel) { renderLevelMap(); return; }
+  if (isLevelUnlocked(currentLevel.id)) {
+    loadLevel(currentLevel.id);
+  } else {
+    const unlockedIdx = getUnlockedIndex();
+    const startLevel = LEVELS[Math.min(unlockedIdx, LEVELS.length - 1)];
+    loadLevel(startLevel.id);
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -944,7 +988,7 @@ requestAnimationFrame(() => {
       // First time: show cold boot cinematic, then start B1
       showBootCinematic(() => {
         loadLevel(BOOT_LEVELS[0].id);
-      });
+      }, { reducedMotion: Arcade.settings.reducedMotion() });
     } else {
       // Returning player: start at first unfinished level
       const unlockedIdx = getUnlockedIndex();

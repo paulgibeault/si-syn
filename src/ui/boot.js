@@ -35,11 +35,26 @@ const TRAINING_COMPLETE_LINES = [
   { text: '', delay: 800 },
 ];
 
+// Whichever cinematic overlay is currently on screen — lets the caller
+// (Arcade.onSuspend) fast-forward it instead of letting its timeout chain
+// keep firing on a hidden tab.
+let activeOverlay = null;
+
+/**
+ * Force the currently-visible boot/training-complete overlay to its finished
+ * state. No-op if nothing is showing.
+ */
+export function suspendBootOverlay() {
+  activeOverlay?.finish();
+}
+
 /**
  * Show the cold-boot cinematic overlay.
  * @param {function} onComplete - Called when animation finishes (or is skipped).
+ * @param {object} [opts]
+ * @param {boolean} [opts.reducedMotion] - Skip the typewriter animation and finish instantly.
  */
-export function showBootCinematic(onComplete) {
+export function showBootCinematic(onComplete, { reducedMotion = false } = {}) {
   const overlay = document.createElement('div');
   overlay.id = 'boot-overlay';
   overlay.innerHTML = `
@@ -59,6 +74,7 @@ export function showBootCinematic(onComplete) {
   function finish() {
     if (finished) return;
     finished = true;
+    activeOverlay = null;
     timeouts.forEach(t => clearTimeout(t));
     overlay.classList.add('boot-fade-out');
     setTimeout(() => {
@@ -66,6 +82,8 @@ export function showBootCinematic(onComplete) {
       onComplete?.();
     }, 600);
   }
+
+  activeOverlay = { finish };
 
   function skip() {
     if (finished) return;
@@ -131,6 +149,12 @@ export function showBootCinematic(onComplete) {
     step();
   }
 
+  if (reducedMotion) {
+    // Skip the typewriter entirely and land on the finished state.
+    skip();
+    return;
+  }
+
   // Type out lines with delays
   let elapsed = 0;
   for (const line of BOOT_LINES) {
@@ -167,8 +191,10 @@ export function showBootCinematic(onComplete) {
 /**
  * Show the "Training Complete" terminal overlay.
  * @param {function} onComplete - Called when the sequence finishes.
+ * @param {object} [opts]
+ * @param {boolean} [opts.reducedMotion] - Skip the typewriter animation and finish instantly.
  */
-export function showTrainingComplete(onComplete) {
+export function showTrainingComplete(onComplete, { reducedMotion = false } = {}) {
   const overlay = document.createElement('div');
   overlay.id = 'boot-overlay';
   overlay.innerHTML = `
@@ -187,6 +213,7 @@ export function showTrainingComplete(onComplete) {
   function finish() {
     if (finished) return;
     finished = true;
+    activeOverlay = null;
     timeouts.forEach(t => clearTimeout(t));
     overlay.classList.add('boot-fade-out');
     setTimeout(() => {
@@ -195,10 +222,17 @@ export function showTrainingComplete(onComplete) {
     }, 600);
   }
 
+  activeOverlay = { finish };
+
   overlay.addEventListener('click', finish);
   overlay.addEventListener('touchstart', () => {
     if (!finished) finish();
   }, { passive: true });
+
+  if (reducedMotion) {
+    finish();
+    return;
+  }
 
   let elapsed = 200;
   for (const line of TRAINING_COMPLETE_LINES) {

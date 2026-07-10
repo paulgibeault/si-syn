@@ -122,6 +122,11 @@ export function createGuide({ container }) {
   return { show, hide };
 }
 
+// The wait-before-showing-the-next-step timer, if one is currently pending —
+// tracked so Arcade.onSuspend/onResume can pause and resume it instead of
+// letting it fire (and pop up a tooltip) on a hidden tab.
+let pendingStep = null; // { timerId, run }
+
 /**
  * Run a sequence of guide steps for a tutorial level.
  * Each step shows a tooltip, waits for dismissal, then shows the next.
@@ -141,16 +146,29 @@ export function runGuideSequence(guide, steps) {
         ? document.querySelector(step.target)
         : step.target;
 
-      setTimeout(() => {
+      const run = () => {
+        pendingStep = null;
         guide.show({
           target,
           text: step.text,
           position: step.position || 'below',
           onDismiss: () => { idx++; showNext(); },
         });
-      }, step.delay || 300);
+      };
+      const timerId = setTimeout(run, step.delay || 300);
+      pendingStep = { timerId, run };
     }
 
     showNext();
   });
+}
+
+/** Cancel a pending "show next step" timer without running it. */
+export function pauseGuideSequence() {
+  if (pendingStep) clearTimeout(pendingStep.timerId);
+}
+
+/** Run a paused "show next step" step immediately, if one is pending. */
+export function resumeGuideSequence() {
+  if (pendingStep) pendingStep.run();
 }
