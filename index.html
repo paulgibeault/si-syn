@@ -46,15 +46,20 @@
     // Set it before first paint so font sizing is correct without a flash.
     (function () {
       var BASE_SCALE = 0.85;
-      function apply() {
-        var local = Arcade.state.get('textScale');
+      function apply(preReady) {
+        // Framed, saved state only exists after Arcade.ready (storage
+        // bridge) — the pre-paint pass uses the default scale and the
+        // ready pass applies the saved one. Standalone, ready resolves
+        // before first paint so the saved scale still lands flash-free.
+        var local = preReady ? 1 : Arcade.state.get('textScale');
         if (typeof local !== 'number' || !isFinite(local)) local = 1;
         var arcadeScale = Arcade.settings.fontScale();
         document.documentElement.style.setProperty('--text-scale', String(BASE_SCALE * local * arcadeScale));
       }
-      apply();
-      Arcade.onSettingsChange(apply);
-      Arcade.onStateReplaced(apply);
+      apply(true);
+      Arcade.ready.then(function () { apply(); });
+      Arcade.onSettingsChange(function () { apply(); });
+      Arcade.onStateReplaced(function () { apply(); });
       window.__applyTextScale = apply;
     })();
 
