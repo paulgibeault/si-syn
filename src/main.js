@@ -22,6 +22,10 @@ import { showBootCinematic, showTrainingComplete, suspendBootOverlay } from './u
 import { createBuilder } from './ui/builder.js';
 import { createCircuitBoard } from './ui/circuit-board.js';
 import { createGuide, runGuideSequence, pauseGuideSequence, resumeGuideSequence } from './ui/guide.js';
+import { initAudio, sfx } from './audio.js';
+
+// Register all SFX cues once at boot (A1). Purely local — no await needed.
+initAudio();
 
 // ---------------------------------------------------------------------------
 // Level registry — training first, then puzzles
@@ -195,7 +199,7 @@ function renderLevelMap() {
     node.appendChild(label);
 
     if (unlocked) {
-      node.addEventListener('click', () => loadLevel(level.id));
+      node.addEventListener('click', () => { sfx('ui-click'); loadLevel(level.id); });
     } else {
       node.title = 'Complete previous levels to unlock';
     }
@@ -243,8 +247,9 @@ function setupCircuitBoard() {
     container: circuitEl,
     gridCols: boardConfig.gridCols || 8,
     gridRows: boardConfig.gridRows || 4,
-    onOpenBuilder: (mcuId) => openBuilderModal(mcuId),
+    onOpenBuilder: (mcuId) => { sfx('ui-click'); openBuilderModal(mcuId); },
     onWiringChange: () => {
+      sfx('ui-click');
       updateRunButton();
     },
   });
@@ -366,7 +371,9 @@ function renderComponentTray(boardConfig) {
 
     btn.addEventListener('click', () => {
       if (board.placed.some(c => c.id === item.id)) return;
-      
+
+      sfx('ui-click');
+
       // Prevent multiple intervals on the same button
       if (btn._trayTimer) clearInterval(btn._trayTimer);
 
@@ -714,10 +721,14 @@ function showResult() {
     const wasAlreadyPassed = isLevelPassed(currentLevel.id);
     markLevelPassed(currentLevel.id);
     renderLevelMap();
+    // First-time solves get the level-complete jingle (fired in onLevelPassed);
+    // re-runs of an already-solved level get the short confirm blip.
+    if (wasAlreadyPassed) sfx('test-pass');
     onLevelPassed(currentLevel.id, wasAlreadyPassed);
   } else {
     resultBanner.textContent = 'SIGNAL MISMATCH';
     resultBanner.className = 'fail';
+    sfx('test-fail');
   }
   resultBanner.style.display = 'block';
 }
@@ -907,6 +918,8 @@ function advanceToNextLevel() {
 }
 
 function onLevelPassed(levelId, wasAlreadyPassed) {
+  // Celebratory jingle only the first time a level is cleared.
+  if (!wasAlreadyPassed) sfx('level-complete');
   const bIdx = BOOT_LEVELS.findIndex(l => l.id === levelId);
   if (!wasAlreadyPassed && bIdx !== -1 && bIdx < BOOT_LEVELS.length - 1) {
     // Auto-advance to next boot lesson (first time only)
