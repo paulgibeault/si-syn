@@ -22,7 +22,7 @@ import { showBootCinematic, showTrainingComplete, suspendBootOverlay } from './u
 import { createBuilder } from './ui/builder.js';
 import { createCircuitBoard } from './ui/circuit-board.js';
 import { createGuide, runGuideSequence, pauseGuideSequence, resumeGuideSequence } from './ui/guide.js';
-import { initAudio, sfx } from './audio.js';
+import { initAudio, sfx, startBench, stopBench } from './audio.js';
 
 // Register all SFX cues once at boot (A1). Purely local — no await needed.
 initAudio();
@@ -703,12 +703,20 @@ function startRun() {
   btnRun.textContent = 'Stop';
   btnRun.className = 'btn-stop';
 
+  // The board comes up and stays up for the whole run. `busy` is how much is
+  // on this board — it colours the bed, never its level.
+  startBench(Math.min(1, (board?.wires?.length || 0) / 8));
+
   lastTickTime = performance.now();
   runTimer = requestAnimationFrame(runLoop);
 }
 
 function stopRun() {
   running = false;
+  // Covers every other way a run can end — the Stop button, an error, leaving
+  // the level. Idempotent, so showResult() having already cut the rail with a
+  // verdict-specific fade wins.
+  stopBench(0.25);
   if (runTimer) { cancelAnimationFrame(runTimer); runTimer = null; }
   if (builder) builder.clearHighlight();
   updateRunButton();
@@ -723,11 +731,17 @@ function showResult() {
     renderLevelMap();
     // First-time solves get the level-complete jingle (fired in onLevelPassed);
     // re-runs of an already-solved level get the short confirm blip.
+    // The rail locks: cut the bed cleanly on the beat, so the pass reads as
+    // the machine finishing rather than as a sound laid over a running board.
+    stopBench(0.06);
     if (wasAlreadyPassed) sfx('test-pass');
     onLevelPassed(currentLevel.id, wasAlreadyPassed);
   } else {
     resultBanner.textContent = 'SIGNAL MISMATCH';
     resultBanner.className = 'fail';
+    // The rail browns out: let the bed sag away under the static instead of
+    // cutting, so the supply audibly dies rather than being switched off.
+    stopBench(0.22);
     sfx('test-fail');
   }
   resultBanner.style.display = 'block';

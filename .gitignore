@@ -4,3 +4,6 @@ dist/
 *.log
 .arcade-stage/
 *.pid
+
+# sound-pack renders — regenerable, and large
+audio/out/
