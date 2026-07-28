@@ -17,6 +17,15 @@
   <link rel="apple-touch-icon" sizes="167x167" href="apple-touch-icon-167.png">
   <link rel="apple-touch-icon" sizes="152x152" href="apple-touch-icon-152.png">
   <script src="/arcade-sdk.js"></script>
+  <!-- Sound. The element library is the SDK's optional audio companion, taken
+       from the EVERGREEN path to match the evergreen /arcade-sdk.js above so
+       the two move majors together. Off the launcher origin it simply 404s and
+       src/audio.js falls back to the archived chiptune profile. The pack is a
+       plain script served from public/, NOT bundled — the offline renderer
+       loads that same file to build the audition, and that equivalence only
+       holds if nothing transforms it. -->
+  <script src="/arcade-audio.js"></script>
+  <script src="/js/soundpack.js"></script>
   <script>
     // Boot the Arcade SDK before any game code reads storage.
     Arcade.init({ gameId: 'si-syn' });
