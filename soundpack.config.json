@@ -2,6 +2,7 @@
   "name": "si-syn",
   "pack": "public/js/soundpack.js",
   "auditions": {
+    "full": "audio/audition.js",
     "short": "audio/audition-short.js"
   },
   "out": "audio/out",
