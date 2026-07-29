@@ -6,7 +6,7 @@
     "node": ">=24"
   },
   "scripts": {
-    "test": "vitest run",
+    "test": "node tools/verify-artifact.mjs && vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "icons": "node scripts/generate-icons.js",
