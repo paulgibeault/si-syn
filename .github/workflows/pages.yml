@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write # version_bump pushes the bump commit back to main
   pages: write
   id-token: write
 
@@ -22,3 +22,9 @@ concurrency:
 jobs:
   fleet:
     uses: paulgibeault/paulgibeault.github.io/.github/workflows/fleet-ci.yml@main
+    with:
+      # This app cache-busts its PWA via a deploy-time patch bump
+      # (package.json and sw.js APP_VERSION; the manifest lives in public/,
+      # out of reach of the start_url rewrite, which is fine — sw.js's new
+      # bytes are what triggers the cache turnover).
+      version_bump: true
