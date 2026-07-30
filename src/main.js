@@ -81,7 +81,11 @@ let board = null;  // circuit board instance
 let currentBoardConfig = null; // for readiness checks
 let guide = null;
 let running = false;
-let runTimer = null;
+// The SDK owns the frame loop: Arcade.loop parks on suspend and re-arms on
+// resume, so the run clock no longer wires that by hand. This is a fixed-
+// interval simulation clock rather than a render loop — the TICK_INTERVAL gate
+// below is what makes it one, and that is unchanged.
+const runTimer = Arcade.loop(runLoop);
 let lastTickTime = 0;
 let prevRegs = { acc: 0, dat: 0, pc: 0 };
 let suspended = false;
@@ -115,13 +119,14 @@ function resumeTimeouts() {
   for (const entry of entries) entry.fn();
 }
 
-function runLoop(timestamp) {
-  if (!running) return;
+// Arcade.loop passes (deltaMs, timestamp); this clock gates on absolute
+// timestamps against TICK_INTERVAL, so only the timestamp is used.
+function runLoop(_deltaMs, timestamp) {
+  if (!running) { runTimer.stop(); return; }
   if (timestamp - lastTickTime >= TICK_INTERVAL) {
     stepOnce();
     lastTickTime = timestamp;
   }
-  if (running) runTimer = requestAnimationFrame(runLoop);
 }
 
 // ---------------------------------------------------------------------------
@@ -708,7 +713,7 @@ function startRun() {
   startBench(Math.min(1, (board?.wires?.length || 0) / 8));
 
   lastTickTime = performance.now();
-  runTimer = requestAnimationFrame(runLoop);
+  runTimer.start();
 }
 
 function stopRun() {
@@ -717,7 +722,7 @@ function stopRun() {
   // the level. Idempotent, so showResult() having already cut the rail with a
   // verdict-specific fade wins.
   stopBench(0.25);
-  if (runTimer) { cancelAnimationFrame(runTimer); runTimer = null; }
+  runTimer.stop();
   if (builder) builder.clearHighlight();
   updateRunButton();
 }
