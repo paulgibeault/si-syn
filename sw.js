@@ -9,12 +9,17 @@
  * version-bump step rewrites the APP_VERSION line at ./sw.js before the
  * build; vite.config.js ships the rewritten file into the artifact root.
  *
- * The precache list is SHELL-ONLY, unlike the static apps': this app is
- * vite-bundled, so its module graph deploys under content-hashed names that
- * cannot be hand-listed. The fetch handler's runtime fill caches each hashed
- * asset on first use — after one online visit the whole build is cached, and
- * a new deploy's new hashes miss the old cache by construction. The eventual
- * fleet-wide fix is build-time precache injection (issue #39).
+ * This app used to be a documented exception: because vite deploys its module
+ * graph under content-hashed names, the precache list could only ever cover
+ * the shell, and the hashed bundle was left to the fetch handler's runtime
+ * fill — so a player's FIRST visit had to be online, and a new deploy's new
+ * hashes missed the old cache by construction. Build-time precache injection
+ * (#39) removed the reason for that: the list is generated from the staged
+ * artifact, which already knows the hashed names, so this app now precaches
+ * its whole build like every other. The variant is retired.
+ *
+ * Runtime fill stays in the fetch handler as a safety net for anything
+ * fetched lazily, but nothing needed for boot depends on it any more.
  */
 
 // Written by fleet CI on every deploy (fleet-ci.yml, "Bump patch version").
@@ -28,31 +33,30 @@ const APP_VERSION = '0.1.1';
 const CACHE_PREFIX = 'si-syn-';
 const CACHE_NAME = `${CACHE_PREFIX}v${APP_VERSION}`;
 
-// Shell + unhashed public/ assets only — see the header for why the bundled
-// module graph is runtime-filled instead of listed.
-// tools/verify-artifact.mjs cross-checks every entry against the deploy.
+// Everything this game needs to boot offline — GENERATED, not maintained.
+// tools/stage.mjs rewrites the region below from the files the deploy actually
+// publishes (tools/inject-precache.mjs), so the list cannot drift from the
+// artifact and a content-hashed bundle name needs no hand edit. To leave a
+// file out, name it in PRECACHE_EXCLUDE in tools/stage.mjs — never here.
+//
+// What is checked in is a placeholder: service workers are off on loopback, so
+// a dev checkout never reads it.
+// arcade:precache-begin
 const ASSETS = [
   './',
   './index.html',
-  './manifest.json',
-  './icon.svg',
-  './icon.png',
-  './favicon.png',
-  './favicon-16.png',
-  './favicon-32.png',
-  './apple-touch-icon.png',
-  './apple-touch-icon-152.png',
-  './apple-touch-icon-167.png',
-  './js/soundpack.js',
-  './icons/icon-96.png',
-  './icons/icon-192.png',
-  './icons/icon-384.png',
-  './icons/icon-512.png',
 ];
+// arcade:precache-end
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
+    caches.open(CACHE_NAME).then(cache => Promise.all(
+      // Per-asset add(), not addAll(). addAll() rejects the WHOLE install on a
+      // single 404, so one missing file costs a returning player their entire
+      // offline shell — silently. A gap should cost one file and a log line.
+      ASSETS.map(asset => cache.add(asset).catch(err =>
+        console.warn('[sw] precache skipped', asset, err && err.message)))
+    ))
   );
   // Deliberately NOT skipWaiting(). The new worker installs and waits; the
   // launcher spots it and offers the player an explicit "update ready" reload,
@@ -107,11 +111,12 @@ self.addEventListener('fetch', event => {
     );
     return;
   }
-  // Cache-first for static assets; cache successful fetches too — for this
-  // bundled app that runtime fill IS the precache for the hashed module
-  // graph (see header).
+  // Cache-first for static assets; cache successful fetches too. The runtime
+  // fill is now a safety net for lazily-fetched files rather than this app's
+  // precache — the hashed module graph is precached at install like the rest
+  // of the fleet's (see header).
   event.respondWith(
-    caches.match(event.request).then(cached => {
+    caches.match(event.request, { ignoreSearch: true }).then(cached => {
       if (cached) return cached;
       return fetch(event.request).then(response => {
         if (response.ok) {

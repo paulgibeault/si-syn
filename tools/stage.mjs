@@ -13,13 +13,30 @@
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { injectPrecache } from "./inject-precache.mjs";
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+// Published, deliberately not precached. This is the only knob on the
+// generated list (tools/inject-precache.mjs), and it is reviewed rather than
+// silent: tools/verify-artifact.mjs fails the build on any published file that
+// is neither cached nor named here.
+//
+// Nothing but the pack the audio layer fetches lazily; the bundled graph is
+// content-hashed and now lists itself, which is what retired this app's
+// shell-only precache variant.
+export const PRECACHE_EXCLUDE = [
+  "js/soundpack.js",
+];
+
 
 export function stage(outDir) {
   const out = path.resolve(ROOT, outDir);
   execFileSync("npx", ["vite", "build", "--outDir", out, "--emptyOutDir"],
     { cwd: ROOT, stdio: "inherit" });
+  // Last, so it sees the finished artifact — the precache list is written from
+  // what is actually about to deploy, not from what anyone believes is.
+  injectPrecache(out, { exclude: PRECACHE_EXCLUDE });
   return { outDir: out };
 }
 
