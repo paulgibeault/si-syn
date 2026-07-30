@@ -10,7 +10,7 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "icons": "node scripts/generate-icons.js",
-    "build": "vite build",
+    "build": "node tools/stage.mjs dist",
     "dev": "vite"
   },
   "devDependencies": {
