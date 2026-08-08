@@ -81,14 +81,15 @@ let board = null;  // circuit board instance
 let currentBoardConfig = null; // for readiness checks
 let guide = null;
 let running = false;
-// The SDK owns the frame loop: Arcade.loop parks on suspend and re-arms on
-// resume, so the run clock no longer wires that by hand. This is a fixed-
-// interval simulation clock rather than a render loop — the TICK_INTERVAL gate
-// below is what makes it one, and that is unchanged.
-const runTimer = Arcade.loop(runLoop);
-let lastTickTime = 0;
+// The run clock is a fixed-interval simulation clock, not a render loop, so
+// it belongs on the SDK's managed timer rather than on Arcade.loop: an rAF
+// loop gated to 200 ms still woke the main thread ~60 times a second to
+// decide not to tick, which is exactly the cost GAME_INTEGRATION §6d is
+// about. Arcade.session.setInterval freezes while the game is suspended and
+// re-arms with the remaining time on resume. Null while stopped — a run that
+// is not running holds no timer at all.
+let runTimer = null;
 let prevRegs = { acc: 0, dat: 0, pc: 0 };
-let suspended = false;
 const TICK_INTERVAL = 200;
 
 // ---------------------------------------------------------------------------
@@ -119,14 +120,15 @@ function resumeTimeouts() {
   for (const entry of entries) entry.fn();
 }
 
-// Arcade.loop passes (deltaMs, timestamp); this clock gates on absolute
-// timestamps against TICK_INTERVAL, so only the timestamp is used.
-function runLoop(_deltaMs, timestamp) {
-  if (!running) { runTimer.stop(); return; }
-  if (timestamp - lastTickTime >= TICK_INTERVAL) {
-    stepOnce();
-    lastTickTime = timestamp;
-  }
+// One simulation tick per interval. stopRun() cancels the timer, so the
+// guard only covers a tick already in flight when the run ended.
+function runTick() {
+  if (!running) { stopRunTimer(); return; }
+  stepOnce();
+}
+
+function stopRunTimer() {
+  if (runTimer) { runTimer.cancel(); runTimer = null; }
 }
 
 // ---------------------------------------------------------------------------
@@ -257,6 +259,7 @@ function setupCircuitBoard() {
       sfx('ui-click');
       updateRunButton();
     },
+    onPlacingEnd: () => syncTrayButtons(),
   });
 
   // Place components
@@ -343,8 +346,23 @@ function inferBoardConfig() {
 // Component tray
 // ---------------------------------------------------------------------------
 
+// Tray buttons that exist right now, so the board can tell them placing ended
+// instead of each of them polling to find out. The old version armed a 100 ms
+// setInterval per click and spun it for as long as the player took to choose a
+// cell — i.e. precisely while the game was visible and waiting for input,
+// which is the state GAME_INTEGRATION §6d says must be quiet.
+let trayButtons = [];
+
+function syncTrayButtons() {
+  for (const { btn, item } of trayButtons) {
+    btn.classList.remove('active');
+    btn.classList.toggle('placed', board?.placed.some(c => c.id === item.id) === true);
+  }
+}
+
 function renderComponentTray(boardConfig) {
   componentTray.innerHTML = '';
+  trayButtons = [];
 
   const available = boardConfig.availableComponents || [];
   if (available.length === 0) {
@@ -379,26 +397,14 @@ function renderComponentTray(boardConfig) {
 
       sfx('ui-click');
 
-      // Prevent multiple intervals on the same button
-      if (btn._trayTimer) clearInterval(btn._trayTimer);
-
+      // Only one component can be in flight, so clear any stale highlight
+      // before claiming this one. The board's onPlacingEnd clears it again.
+      syncTrayButtons();
       board.startPlacing(item.type, item.id, item.outputPins || [], item.inputPins || []);
       btn.classList.add('active');
-
-      // Deactivate on place or cancel
-      btn._trayTimer = setInterval(() => {
-        if (suspended) return; // avoid churning while the tab is hidden
-        if (board.mode !== 'placing') {
-          clearInterval(btn._trayTimer);
-          btn._trayTimer = null;
-          btn.classList.remove('active');
-          if (board.placed.some(c => c.id === item.id)) {
-            btn.classList.add('placed');
-          }
-        }
-      }, 100);
     });
 
+    trayButtons.push({ btn, item });
     componentTray.appendChild(btn);
   }
 }
@@ -712,8 +718,8 @@ function startRun() {
   // on this board — it colours the bed, never its level.
   startBench(Math.min(1, (board?.wires?.length || 0) / 8));
 
-  lastTickTime = performance.now();
-  runTimer.start();
+  stopRunTimer(); // idempotent start — never stack two clocks on one board
+  runTimer = Arcade.session.setInterval(runTick, TICK_INTERVAL);
 }
 
 function stopRun() {
@@ -722,7 +728,7 @@ function stopRun() {
   // the level. Idempotent, so showResult() having already cut the rail with a
   // verdict-specific fade wins.
   stopBench(0.25);
-  runTimer.stop();
+  stopRunTimer();
   if (builder) builder.clearHighlight();
   updateRunButton();
 }
@@ -982,13 +988,11 @@ let wasRunningOnSuspend = false;
 Arcade.onSuspend(() => {
   wasRunningOnSuspend = running;
   if (running) stopRun();
-  suspended = true;
   pauseTimeouts();
   pauseGuideSequence();
   suspendBootOverlay();
 });
 Arcade.onResume(() => {
-  suspended = false;
   resumeTimeouts();
   resumeGuideSequence();
   if (wasRunningOnSuspend) {

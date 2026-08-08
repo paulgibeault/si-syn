@@ -467,10 +467,32 @@
       border-color: var(--accent);
       box-shadow: 0 0 8px rgba(57,186,230,0.5);
     }
-    .cb-pin.compatible { animation: pin-pulse 1s ease-in-out infinite; }
+    /* "You can land the wire here." GAME_INTEGRATION §6d: the glow is a
+       pseudo-element carrying a STATIC box-shadow and the pulse animates its
+       opacity — a compositor job. Animating box-shadow itself repainted the
+       whole pin on the main thread every frame, forever. The pulse is bounded
+       by --arcade-pulse-count (3 / 1 under power saver / 1 instant frame under
+       reduced motion), and it settles to a static half-strength ring rather
+       than to nothing, so a compatible pin still reads once the motion stops.
+       The ring is deliberately the whole resting tell: the pin's own border
+       stays green-for-output / blue-for-input, which is information the
+       highlight must not overwrite. */
+    .cb-pin.compatible::after {
+      content: '';
+      position: absolute;
+      inset: -2px;
+      border-radius: 50%;
+      box-shadow: 0 0 8px 3px rgba(57,186,230,0.4);
+      pointer-events: none;
+      opacity: 0.55;
+      animation: pin-pulse 1s ease-in-out;
+      animation-iteration-count: var(--arcade-pulse-count, 3);
+    }
+    /* Endpoints match the resting opacity above, so the pulse starts and
+       settles without a visible step. */
     @keyframes pin-pulse {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(57,186,230,0); }
-      50% { box-shadow: 0 0 8px 3px rgba(57,186,230,0.4); }
+      0%, 100% { opacity: 0.55; }
+      50% { opacity: 1; }
     }
     .cb-pin-label {
       position: absolute;
@@ -700,7 +722,10 @@
       border: 1px solid var(--green);
       border-radius: 6px;
       box-shadow: 0 0 12px rgba(127,217,98,0.2);
-      animation: next-pulse 2s ease-in-out infinite;
+      /* Bounded per §6d. Rests at full opacity — the green border and glow
+         are static, so the prompt is at its most legible once it settles. */
+      animation: next-pulse 2s ease-in-out;
+      animation-iteration-count: var(--arcade-pulse-count, 3);
     }
     #next-challenge:active { background: rgba(26,51,32,1); }
     .next-label {
@@ -714,8 +739,8 @@
       font-size: calc(clamp(10px, calc(4px + 1.6vw), 20px) * var(--text-scale));
     }
     @keyframes next-pulse {
-      0%, 100% { opacity: 0.7; }
-      50% { opacity: 1; }
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
     }
     #code-error {
       font-size: calc(clamp(11px, calc(5.6px + 1.44vw), 20px) * var(--text-scale));
@@ -824,14 +849,30 @@
       border-color: var(--accent);
     }
     .cell-locked { cursor: default !important; opacity: 0.7; }
+    /* "This argument is still blank." Same treatment as .cb-pin.compatible:
+       static shadow on a pseudo-element, opacity-only pulse, bounded by
+       --arcade-pulse-count. The resting state is the yellow border and text
+       (unconditional, not animated) plus a static half-strength glow — the
+       slot still says "fill me in" with the compositor idle. */
     .blank-arg {
-      animation: pulse-blank 1.5s ease-in-out infinite;
+      position: relative;
       border-color: var(--yellow) !important;
       color: var(--yellow) !important;
     }
+    .blank-arg::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      box-shadow: 0 0 8px 2px rgba(230,180,80,0.3);
+      pointer-events: none;
+      opacity: 0.5;
+      animation: pulse-blank 1.5s ease-in-out;
+      animation-iteration-count: var(--arcade-pulse-count, 3);
+    }
     @keyframes pulse-blank {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(230,180,80,0); }
-      50% { box-shadow: 0 0 8px 2px rgba(230,180,80,0.3); }
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 1; }
     }
     .slot-num {
       font-size: calc(clamp(10px, calc(5.2px + 1.28vw), 18px) * var(--text-scale));
@@ -876,12 +917,15 @@
       color: var(--accent);
       border-style: dashed;
       border-color: var(--accent);
+      /* Bounded per §6d; rests on the dashed accent border at opacity 0.6,
+         which is what marked a placeholder slot in the first place. */
       opacity: 0.6;
-      animation: placeholder-pulse 2s ease-in-out infinite;
+      animation: placeholder-pulse 2s ease-in-out;
+      animation-iteration-count: var(--arcade-pulse-count, 3);
     }
     @keyframes placeholder-pulse {
-      0%, 100% { opacity: 0.4; }
-      50% { opacity: 0.8; }
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
     }
     .slot-label-badge {
       font-size: calc(clamp(10px, calc(5.2px + 1.28vw), 18px) * var(--text-scale));
@@ -1097,7 +1141,12 @@
     #boot-cursor {
       display: inline-block;
       color: #00cc44;
-      animation: cursor-blink 0.8s step-end infinite;
+      /* A terminal blink is the one purely decorative loop here, and it was
+         the one that ran forever behind a boot screen nobody is interacting
+         with. Bounded per §6d; a solid block cursor is the resting state and
+         still reads as a terminal caret. */
+      animation: cursor-blink 0.8s step-end;
+      animation-iteration-count: var(--arcade-pulse-count, 3);
     }
     @keyframes cursor-blink {
       0%, 100% { opacity: 1; }
@@ -1110,11 +1159,16 @@
       font-family: 'Courier New', monospace;
       letter-spacing: 2px;
       text-transform: uppercase;
-      animation: skip-pulse 2s ease-in-out infinite;
+      /* Bounded per §6d. Rests at the pulse's bright end, not its dim one —
+         "tap to skip" has to stay readable for the whole cinematic, and the
+         affordance is the point. */
+      opacity: 0.9;
+      animation: skip-pulse 2s ease-in-out;
+      animation-iteration-count: var(--arcade-pulse-count, 3);
     }
     @keyframes skip-pulse {
-      0%, 100% { opacity: 0.4; }
-      50% { opacity: 0.9; }
+      0%, 100% { opacity: 0.9; }
+      50% { opacity: 0.4; }
     }
 
     /* --- Tutorial / Reference overlay (centered card) --- */
