@@ -62,6 +62,8 @@ const COMP_TYPES = {
  * @param {number}      opts.gridRows    - Grid rows (default 5)
  * @param {function}    opts.onOpenBuilder - Called when MCU is tapped: (mcuId)
  * @param {function}    opts.onWiringChange - Called when wires change
+ * @param {function}    opts.onPlacingEnd - Called when placing mode ends, however
+ *                                          it ends (placed, cancelled, or escaped).
  */
 export function createCircuitBoard({
   container,
@@ -69,6 +71,7 @@ export function createCircuitBoard({
   gridRows = 5,
   onOpenBuilder,
   onWiringChange,
+  onPlacingEnd,
 }) {
   // State
   const placed = [];       // { type, id, col, row, pins[], locked, el }
@@ -432,13 +435,18 @@ export function createCircuitBoard({
     showGhost(type);
   }
 
+  // Every exit from placing mode funnels through here — a successful place, a
+  // tap on a pin, and the public cancelPlacing() all land on it — so it is the
+  // one place that has to announce the end of placing.
   function cancelPlacing() {
+    const wasPlacing = mode === 'placing';
     mode = 'idle';
     placingType = null;
     placingId = null;
     placingPins = null;
     hideGhost();
     setStatus('');
+    if (wasPlacing) onPlacingEnd?.();
   }
 
   function showGhost(type) {
