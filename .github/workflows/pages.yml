@@ -33,3 +33,5 @@ jobs:
       # out of reach of the start_url rewrite, which is fine — sw.js's new
       # bytes are what triggers the cache turnover).
       version_bump: true
+      # Publish the game's offline pack so the launcher can run it with no network.
+      offline_pack: true
